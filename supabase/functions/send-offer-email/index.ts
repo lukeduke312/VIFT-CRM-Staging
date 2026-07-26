@@ -110,7 +110,7 @@ async function fetchSignedAttachments(
   const offerAttachments: Array<{
     id: string; storagePath: string; originalFileName: string;
     active?: boolean;
-  }> = Array.isArray(storeRow.value) ? storeRow.value as typeof [] : []
+  }> = Array.isArray(storeRow.value) ? storeRow.value : []
 
   const results: Array<{ filename: string; content: string }> = []
 
