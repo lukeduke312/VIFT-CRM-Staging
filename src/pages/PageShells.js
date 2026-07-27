@@ -3334,6 +3334,7 @@ ${hasRut?`<div class="rut">
         method:  'POST',
         headers: {
           'Content-Type':  'application/json',
+          'apikey': (typeof SUPABASE_AKEY !== 'undefined' ? SUPABASE_AKEY : ''),
           'Authorization': 'Bearer ' + jwt,
         },
         body: JSON.stringify({
@@ -3484,7 +3485,11 @@ ${hasRut?`<div class="rut">
       const base  = (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : '').replace(/\/$/, '');
       const res   = await fetch(base + '/functions/v1/send-offer-email', {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + jwt },
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': (typeof SUPABASE_AKEY !== 'undefined' ? SUPABASE_AKEY : ''),
+          'Authorization': 'Bearer ' + jwt
+        },
         body: JSON.stringify({
           offerId: off.id, offerVersion: off.version || 1,
           recipients, cc: [], bcc: [], subject, bodyHtml,
@@ -3719,7 +3724,10 @@ ${hasRut?`<div class="rut">
       try {
         const res = await fetch(EDGE_BASE + '/functions/v1/offer-attachment-upload', {
           method: 'POST',
-          headers: { 'Authorization': 'Bearer ' + (AuthService.getAccessToken() || '') },
+          headers: {
+            'apikey': (typeof SUPABASE_AKEY !== 'undefined' ? SUPABASE_AKEY : ''),
+            'Authorization': 'Bearer ' + (AuthService.getAccessToken() || '')
+          },
           body: fd
         });
         const json = await res.json();
@@ -3817,6 +3825,7 @@ ${hasRut?`<div class="rut">
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
+          'apikey': (typeof SUPABASE_AKEY !== 'undefined' ? SUPABASE_AKEY : ''),
           'Authorization': 'Bearer ' + (AuthService.getAccessToken() || '')
         },
         body: JSON.stringify({ attachmentId, offerId })
