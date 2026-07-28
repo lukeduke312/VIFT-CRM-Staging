@@ -136,6 +136,7 @@ serve(async (req: Request) => {
 
   const attachmentId  = String(body.attachmentId  ?? '').trim()
   const customerToken = String(body.token          ?? '').trim()
+  const mode          = body.mode === 'view' ? 'view' : 'download'
 
   if (!attachmentId) return json({ error: 'not_found' }, 404)
 
@@ -254,11 +255,15 @@ serve(async (req: Request) => {
 
   /* ── Generera signerad URL ───────────────────────────────── */
   const pathInBucket = storagePath.replace(`${STORAGE_BUCKET}/`, '')
+  const fileName = String(att.displayName || att.originalFileName || 'bilaga')
+
   const { data: signedData, error: signedErr } = await supabase.storage
     .from(STORAGE_BUCKET)
-    .createSignedUrl(pathInBucket, SIGNED_URL_TTL_SECONDS, {
-      download: String(att.displayName || att.originalFileName || 'bilaga')
-    })
+    .createSignedUrl(
+      pathInBucket,
+      SIGNED_URL_TTL_SECONDS,
+      mode === 'download' ? { download: fileName } : {}
+    )
 
   if (signedErr || !signedData?.signedUrl) {
     console.error('[offer-attachment-url] signedUrl fel')

@@ -3656,7 +3656,8 @@ ${hasRut?`<div class="rut">
               <div style="font-size:10px;color:var(--mt);">${esc(a.mimeType)} · ${sizeLbl}${lockedBadge}${pubBadge}${pdfBadge}</div>
             </div>
             <div style="display:flex;gap:4px;flex-shrink:0;">
-              <button type="button" class="btn bs" style="font-size:10px;padding:3px 7px;" onclick="OfferDetailPage._downloadAttachment('${esc(a.id)}')">${ic('download',10)}</button>
+              <button type="button" class="btn bs" title="Visa" style="font-size:10px;padding:3px 7px;" onclick="OfferDetailPage._viewAttachment('${esc(a.id)}')">${ic('eye',10)}</button>
+              <button type="button" class="btn bs" title="Ladda ner" style="font-size:10px;padding:3px 7px;" onclick="OfferDetailPage._downloadAttachment('${esc(a.id)}')">${ic('download',10)}</button>
               <button type="button" class="btn bs" style="font-size:10px;padding:3px 7px;" onclick="OfferDetailPage._editAttachment('${esc(a.id)}','${esc(off.id)}')">${ic('edit-2',10)}</button>
               <button type="button" class="btn bs" style="font-size:10px;padding:3px 7px;color:var(--rd);" onclick="OfferDetailPage._deleteAttachment('${esc(a.id)}','${esc(off.id)}')">${ic('trash-2',10)}</button>
             </div>
@@ -3747,6 +3748,48 @@ ${hasRut?`<div class="rut">
     this.render({offerId});
   },
 
+  async _viewAttachment(attachmentId) {
+    const EDGE_BASE = (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : '').replace(/\/$/, '');
+    const att = (state.offerAttachments || []).find(a => a.id === attachmentId);
+    if (!att) return;
+
+    const previewWindow = window.open('', '_blank');
+
+    try {
+      showToast('Öppnar bilaga…');
+
+      const res = await fetch(EDGE_BASE + '/functions/v1/offer-attachment-url', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': (typeof SUPABASE_AKEY !== 'undefined' ? SUPABASE_AKEY : ''),
+          'Authorization': 'Bearer ' + (Auth.getAccessToken() || '')
+        },
+        body: JSON.stringify({
+          attachmentId,
+          offerId: att.offerId,
+          mode: 'view'
+        })
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        throw new Error(json.error || res.status);
+      }
+
+      if (!previewWindow) {
+        throw new Error('Webbläsaren blockerade den nya fliken');
+      }
+
+      previewWindow.opener = null;
+      previewWindow.location.href = json.url;
+    } catch (e) {
+      if (previewWindow) previewWindow.close();
+      showToast('Fel vid visning: ' + e.message, 'error');
+    }
+  },
+
   async _downloadAttachment(attachmentId) {
     const EDGE_BASE = (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : '').replace(/\/$/, '');
     const att = (state.offerAttachments || []).find(a => a.id === attachmentId);
@@ -3760,7 +3803,11 @@ ${hasRut?`<div class="rut">
           'apikey': (typeof SUPABASE_AKEY !== 'undefined' ? SUPABASE_AKEY : ''),
           'Authorization': 'Bearer ' + (Auth.getAccessToken() || '')
         },
-        body: JSON.stringify({ attachmentId })
+        body: JSON.stringify({
+          attachmentId,
+          offerId: att.offerId,
+          mode: 'download'
+        })
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || res.status);
