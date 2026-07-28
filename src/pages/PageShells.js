@@ -3719,7 +3719,7 @@ ${hasRut?`<div class="rut">
       const fd = new FormData();
       fd.append('file', file);
       fd.append('offerId', offerId);
-      fd.append('versionId', versionId || offerId);
+      fd.append('offerVersionId', versionId || offerId);
       fd.append('uploadedBy', (state.currentUser && state.currentUser.id) || '');
       try {
         const res = await fetch(EDGE_BASE + '/functions/v1/offer-attachment-upload', {
