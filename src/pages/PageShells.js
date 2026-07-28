@@ -3753,9 +3753,15 @@ ${hasRut?`<div class="rut">
     const att = (state.offerAttachments || []).find(a => a.id === attachmentId);
     if (!att) return;
 
-    const previewWindow = window.open('', '_blank');
+    const previewWindow = window.open('about:blank', '_blank');
+
+    if (!previewWindow) {
+      showToast('Webbläsaren blockerade visningsfönstret', 'error');
+      return;
+    }
 
     try {
+      previewWindow.document.title = 'Öppnar bilaga…';
       showToast('Öppnar bilaga…');
 
       const res = await fetch(EDGE_BASE + '/functions/v1/offer-attachment-url', {
@@ -3778,14 +3784,14 @@ ${hasRut?`<div class="rut">
         throw new Error(json.error || res.status);
       }
 
-      if (!previewWindow) {
-        throw new Error('Webbläsaren blockerade den nya fliken');
+      if (!json.url || typeof json.url !== 'string') {
+        throw new Error('Servern returnerade ingen visningslänk');
       }
 
-      previewWindow.opener = null;
-      previewWindow.location.href = json.url;
+      const targetUrl = new URL(json.url, EDGE_BASE).href;
+      previewWindow.location.replace(targetUrl);
     } catch (e) {
-      if (previewWindow) previewWindow.close();
+      previewWindow.close();
       showToast('Fel vid visning: ' + e.message, 'error');
     }
   },

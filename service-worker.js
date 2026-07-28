@@ -14,7 +14,7 @@
  * Ny version: bump CACHE_NAME → gamla cacher raderas vid activate.
  */
 
-const CACHE_NAME = 'vift-crm-v17';
+const CACHE_NAME = 'vift-crm-v18';
 
 /* Filer att förcacha vid install (app shell) */
 const PRECACHE_URLS = [
