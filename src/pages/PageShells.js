@@ -3325,7 +3325,7 @@ ${hasRut?`<div class="rut">
 
     // Försök via Edge Function
     try {
-      const jwt = typeof AuthService !== 'undefined' ? AuthService.getAccessToken() : null;
+      const jwt = typeof Auth !== 'undefined' ? Auth.getAccessToken() : null;
       if (!jwt) throw new Error('Inte inloggad');
 
       const base  = (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : '').replace(/\/$/, '');
@@ -3480,7 +3480,7 @@ ${hasRut?`<div class="rut">
     let sendOk  = false;
     let sendErr = '';
     try {
-      const jwt   = typeof AuthService !== 'undefined' ? AuthService.getAccessToken() : null;
+      const jwt   = typeof Auth !== 'undefined' ? Auth.getAccessToken() : null;
       if (!jwt) throw new Error('Inte inloggad');
       const base  = (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : '').replace(/\/$/, '');
       const res   = await fetch(base + '/functions/v1/send-offer-email', {
@@ -3726,7 +3726,7 @@ ${hasRut?`<div class="rut">
           method: 'POST',
           headers: {
             'apikey': (typeof SUPABASE_AKEY !== 'undefined' ? SUPABASE_AKEY : ''),
-            'Authorization': 'Bearer ' + (AuthService.getAccessToken() || '')
+            'Authorization': 'Bearer ' + (Auth.getAccessToken() || '')
           },
           body: fd
         });
@@ -3744,7 +3744,7 @@ ${hasRut?`<div class="rut">
     persist();
     if (progressEl) progressEl.textContent = uploaded + ' fil(er) uppladdade' + (errors ? ', ' + errors + ' fel' : '') + '.';
     setTimeout(() => { if (progressEl) progressEl.textContent = ''; }, 4000);
-    Router.refresh();
+    this.render({offerId});
   },
 
   async _downloadAttachment(attachmentId) {
@@ -3757,7 +3757,8 @@ ${hasRut?`<div class="rut">
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + (AuthService.getAccessToken() || '')
+          'apikey': (typeof SUPABASE_AKEY !== 'undefined' ? SUPABASE_AKEY : ''),
+          'Authorization': 'Bearer ' + (Auth.getAccessToken() || '')
         },
         body: JSON.stringify({ attachmentId })
       });
@@ -3807,7 +3808,7 @@ ${hasRut?`<div class="rut">
         att.includeInPublicView  = document.getElementById('att-edit-pub').checked;
         att.includeInCombinedPdf = document.getElementById('att-edit-pdf').checked;
         persist();
-        Router.refresh();
+        this.render({offerId});
         showToast('Bilaga uppdaterad');
       }
     });
@@ -3826,7 +3827,7 @@ ${hasRut?`<div class="rut">
         headers: {
           'Content-Type': 'application/json',
           'apikey': (typeof SUPABASE_AKEY !== 'undefined' ? SUPABASE_AKEY : ''),
-          'Authorization': 'Bearer ' + (AuthService.getAccessToken() || '')
+          'Authorization': 'Bearer ' + (Auth.getAccessToken() || '')
         },
         body: JSON.stringify({ attachmentId, offerId })
       });
@@ -3840,7 +3841,7 @@ ${hasRut?`<div class="rut">
     }
     att.active = false;
     persist();
-    Router.refresh();
+    this.render({offerId});
     showToast('Bilaga borttagen');
   },
 
@@ -3875,7 +3876,8 @@ ${hasRut?`<div class="rut">
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + (AuthService.getAccessToken() || '')
+          'apikey': (typeof SUPABASE_AKEY !== 'undefined' ? SUPABASE_AKEY : ''),
+          'Authorization': 'Bearer ' + (Auth.getAccessToken() || '')
         },
         body: JSON.stringify({ offerId })
       });
