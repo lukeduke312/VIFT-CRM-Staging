@@ -12,9 +12,13 @@
  *   assets/             → Cache first med network-fallback
  *
  * Ny version: bump CACHE_NAME → gamla cacher raderas vid activate.
+ * v19: send-offer-email v2 — PageShells v93 (auto-token, ingen mailto-fallback)
+ * v20: send-offer-email v3 — PageShells v94 (state-patching, offer-token-validate snapshot)
+ * v21: send-offer-email v4 — PageShells v95
+ * v22: send-offer-email v5 — PageShells v96
  */
 
-const CACHE_NAME = 'vift-crm-v18';
+const CACHE_NAME = 'vift-crm-v22';
 
 /* Filer att förcacha vid install (app shell) */
 const PRECACHE_URLS = [
@@ -166,4 +170,3 @@ self.addEventListener('notificationclick', event => {
       })
   );
 });
-

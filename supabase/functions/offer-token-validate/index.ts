@@ -1,12 +1,19 @@
 /**
- * offer-token-validate — Supabase Edge Function (Leverans E, Del E2)
+ * offer-token-validate — Supabase Edge Function (Leverans E, Del E2, v4)
  *
  * Validerar en publik offerttoken och returnerar offertens publika data.
  * Uppdaterar öppningsräknare och openedAt vid första besök.
  *
+ * v2: när lockedSnapshotJSON finns används det för offertinnehållet (priser,
+ *     rader, villkor, kundnamn). Dynamiska metadata (status, tokenExpiresAt,
+ *     openCount, openedAt) hämtas alltid från live-offerten.
+ * v3: strikt snapshot — inget nullish-fallback till live-offert för innehållsfält;
+ *     bilagor filtreras via snapshot.publicAttachmentIds om tillgängligt (låst vid utskick).
+ *
  * SÄKERHETSREGLER:
  * - Interna fält exponeras ALDRIG (inköpspris, marginal, TB, internalNote,
  *   personaldata, annan kundinformation, customerApproval.token, m.fl.)
+ * - lockedSnapshotJSON parsas säkert — ogiltig JSON faller tillbaka på live-offert
  * - Tokenkontroll, giltighetstid och återkallning kontrolleras server-side
  * - Rate-limit: max 30 req / minut per IP
  *
@@ -51,6 +58,20 @@ function checkRateLimit(ip: string): boolean {
   }
   slot.count++
   return slot.count <= RATE_MAX_PER_IP
+}
+
+
+/* ── Validera versionssnapshot ───────────────────────────── */
+function parseValidSnapshot(raw: unknown, offerId: string): Record<string, unknown> | null {
+  try {
+    if (!raw) return null
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+    const snap = parsed as Record<string, unknown>
+    if (String(snap.id ?? '') !== offerId) return null
+    if (!Array.isArray(snap.lines) || !Array.isArray(snap.extras) || !Array.isArray(snap.publicAttachmentIds)) return null
+    return snap
+  } catch { return null }
 }
 
 /* ── Handler ─────────────────────────────────────────────── */
@@ -131,10 +152,13 @@ serve(async (req: Request) => {
       })
     }
 
-    /* Bygg publik offertdata — INGA interna fält */
-    const publicOffer = buildPublicOffer(off)
+    /* Giltigt snapshot är auktoritativt; ogiltigt/ofullständigt snapshot behandlas som legacy */
+    const snapshot = parseValidSnapshot(off.lockedSnapshotJSON, String(off.id ?? ''))
 
-    /* Hämta kundsynliga bilagor — exkludera interna (includeInPublicView=false) */
+    /* Bygg publik offertdata — INGA interna fält */
+    const publicOffer = buildPublicOffer(off, snapshot)
+
+    /* Hämta kundsynliga bilagor — filtreras via snapshot.publicAttachmentIds om tillgängligt */
     const { data: attRow } = await supabase
       .from('store')
       .select('value')
@@ -144,12 +168,20 @@ serve(async (req: Request) => {
     const allAtts: Record<string, unknown>[] =
       Array.isArray(attRow?.value) ? attRow.value as Record<string, unknown>[] : []
 
+    const publicAttachmentIds = snapshot
+      ? (snapshot.publicAttachmentIds as unknown[]).map(id => String(id))
+      : null
+
     const publicAtts = allAtts
-      .filter(a =>
-        a.offerId === off.id &&
-        a.active  !== false  &&
-        a.includeInPublicView === true
-      )
+      .filter(a => {
+        if (a.offerId !== off.id || a.active === false) return false
+        /* Om snapshot har publicAttachmentIds — använd dem (låsta vid utskick) */
+        if (publicAttachmentIds !== null) {
+          return publicAttachmentIds.includes(String(a.id))
+        }
+        /* Legacy: inget snapshot → använd aktuellt includeInPublicView */
+        return a.includeInPublicView === true
+      })
       .sort((a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0))
       .map(a => ({
         id:             a.id,
@@ -171,37 +203,40 @@ serve(async (req: Request) => {
 })
 
 /* ── Publika fält — EXKLUDERAR alla interna fält ─────────── */
-function buildPublicOffer(off: Record<string, unknown>): Record<string, unknown> {
+function buildPublicOffer(
+  off: Record<string, unknown>,
+  snap: Record<string, unknown> | null
+): Record<string, unknown> {
+  /* Giltigt snapshot är strikt auktoritativt för innehållsfält. */
+  const s = (key: string): unknown => snap !== null ? snap[key] : off[key]
+
   return {
     id:             off.id,
-    title:          off.title,
-    versionNumber:  off.versionNumber,
+    /* Innehållsfält — från snapshot om tillgängligt */
+    title:          s('title'),
+    versionNumber:  s('versionNumber'),
+    customerName:   s('customerName')  ?? '',
+    lines:          filterPublicLines(s('lines')),
+    extras:         filterPublicLines(s('extras')),
+    discount:       s('discount')      ?? null,
+    taxType:        s('taxType')       ?? 'moms',
+    rotRutAmount:   s('rotRutAmount')  ?? 0,
+    date:           snap !== null ? (s('date') ?? '') : (off.date ?? off.createdAt ?? ''),
+    validUntil:     s('validUntil')    ?? '',
+    paymentTerms:   s('paymentTerms')  ?? '',
+    validityText:   s('validityText')  ?? '',
+    terms:          s('terms')         ?? '',
+    includes:       s('includes')      ?? '',
+    excludes:       s('excludes')      ?? '',
+    scope:          s('scope')         ?? '',
+    summary:        s('summary')       ?? '',
+    generalTerms:   s('generalTerms')  ?? '',
+    address:        s('address')       ?? '',
+    /* Dynamiska metadata — alltid från live-offerten */
     status:         off.status,
-    /* Kundinfo (ej andra kunder, ej intern kunddata) */
-    customerName:   off.customerName   ?? '',   // snapshot
     contactName:    off.contactName    ?? '',
     contactEmail:   off.contactEmail   ?? '',
-    /* Offertinnehåll */
-    lines:          filterPublicLines(off.lines),
-    extras:         filterPublicLines(off.extras),
-    discount:       off.discount       ?? null,
-    taxType:        off.taxType        ?? 'moms',
-    rotRutAmount:   off.rotRutAmount   ?? 0,
-    /* Datum & villkor */
-    date:           off.date           ?? off.createdAt ?? '',
-    validUntil:     off.validUntil     ?? '',
-    paymentTerms:   off.paymentTerms   ?? '',
-    validityText:   off.validityText   ?? '',
-    terms:          off.terms          ?? '',
-    includes:       off.includes       ?? '',
-    excludes:       off.excludes       ?? '',
-    scope:          off.scope          ?? '',
-    summary:        off.summary        ?? '',
-    generalTerms:   off.generalTerms   ?? '',
-    /* Fastighetsreferens */
-    address:        off.address        ?? '',
     propertyId:     off.propertyId     ?? '',
-    /* Tokeninfo */
     tokenExpiresAt: off.tokenExpiresAt ?? '',
     openCount:      off.openCount      ?? 0,
     openedAt:       off.openedAt       ?? '',

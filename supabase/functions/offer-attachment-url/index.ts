@@ -1,5 +1,5 @@
 /**
- * offer-attachment-url — Supabase Edge Function (Leverans E, Del E2b-3)
+ * offer-attachment-url — Supabase Edge Function (Leverans E, Del E2b-3, v3)
  *
  * Genererar en tidsbegränsad signerad URL för nedladdning av offertbilaga.
  * Två separata autentiseringsvägar:
@@ -7,7 +7,8 @@
  *  A. Publik tokenväg (kund utan inloggning):
  *     Body: { token: string, attachmentId: string }
  *     Kontroller: giltig token → ej återkallad → ej utgången →
- *                 bilaga tillhör offerten → includeInPublicView = true →
+ *                 bilaga tillhör offerten →
+ *                 snapshot.publicAttachmentIds (om finns) ELLER includeInPublicView=true →
  *                 bilaga aktiv → URL
  *
  *  B. Intern JWT-väg (CRM-användare):
@@ -123,6 +124,19 @@ function json(data: unknown, status = 200): Response {
   })
 }
 
+
+function parseValidSnapshot(raw: unknown, offerId: string): Record<string, unknown> | null {
+  try {
+    if (!raw) return null
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+    const snap = parsed as Record<string, unknown>
+    if (String(snap.id ?? '') !== offerId) return null
+    if (!Array.isArray(snap.lines) || !Array.isArray(snap.extras) || !Array.isArray(snap.publicAttachmentIds)) return null
+    return snap
+  } catch { return null }
+}
+
 /* ── Handler ─────────────────────────────────────────────── */
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
@@ -187,8 +201,17 @@ serve(async (req: Request) => {
       }
     }
 
-    /* Bilagan måste tillhöra denna offert och vara synlig för kund */
-    if (att.offerId !== offer.id || att.includeInPublicView !== true) {
+    /* Verifiera att bilagan tillhör denna offert */
+    if (att.offerId !== offer.id) {
+      return json({ error: 'forbidden' }, 403)
+    }
+
+    /* Giltigt snapshot låser exakt vilka kundbilagor som hör till denna token. */
+    const snapshot = parseValidSnapshot(offer.lockedSnapshotJSON, String(offer.id ?? ''))
+    const allowed = snapshot
+      ? (snapshot.publicAttachmentIds as unknown[]).map(id => String(id)).includes(attachmentId)
+      : att.includeInPublicView === true
+    if (!allowed) {
       return json({ error: 'forbidden' }, 403)
     }
 

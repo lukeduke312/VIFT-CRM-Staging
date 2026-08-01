@@ -2,6 +2,10 @@
  * PageShells — Placeholder-rendering för sidor som byggs i Fas 3+ (v75)
  * Fas 2-sidor (Kunder, AO, Tid, Faktura) har egna filer.
  * v75: gemensamma beräkningsfunktioner _lineExVat/_offRawExVat, offert-totaler-fix (alla 5 platser)
+ * v93: send-offer-email — offerToken/sentBy server-side; auto-token+snapshot; rätt länk; ingen mailto-fallback
+ * v94: patch state (offerPatch/attachmentPatches/emailEvent) före persist; kundvy via snapshot
+ * v95: v4-patch; serverpatchar vid fel; attachment-validering; snapshot-kontroll; email_sent i tidslinje
+ * v96: v5-patch; persist endast vid verkliga serverpatchar; korrekt misslyckad e-posthändelse
  */
 
 /* ── Offerter (v2 – tjänstemallar + kalkylator) ─────── */
@@ -2527,18 +2531,24 @@ const OfferDetailPage = {
     const tl = (off.timeline || []).slice().map(function(e) { return Object.assign({}, e, {_src:'internal'}); });
 
     const extEvents = (state.offerEvents || []).filter(function(e) { return e.offerId === off.id; });
-    const _extLabel = { opened:'Kund öppnade länk', approved:'Kund godkände offert', change_requested:'Kund begärde ändring', declined:'Kund nekade offert', revoked:'Länk återkallad', renewed:'Länk förnyad' };
+    const _extLabel = { opened:'Kund öppnade länk', approved:'Kund godkände offert', change_requested:'Kund begärde ändring', declined:'Kund nekade offert', revoked:'Länk återkallad', renewed:'Länk förnyad', email_sent:'Offert skickad via e-post' };
     extEvents.forEach(function(e) {
-      var desc = (_extLabel[e.type] || e.type) + (e.byCustomer ? ' — ' + e.byCustomer : '') + (e.byEmail ? ' (' + e.byEmail + ')' : '') + (e.comment ? ': ' + e.comment.slice(0,120) : '');
-      tl.push({ ts: e.ts, type: e.type, text: desc, user: e.byCustomer || 'Kund', _src:'customer' });
+      var baseLabel = e.type === 'email_sent' && e.status === 'failed'
+        ? 'E-postutskick misslyckades'
+        : (_extLabel[e.type] || e.type);
+      var recipientText = e.type === 'email_sent' && Array.isArray(e.recipients) && e.recipients.length
+        ? ' — ' + e.recipients.join(', ')
+        : '';
+      var desc = baseLabel + recipientText + (e.byCustomer ? ' — ' + e.byCustomer : '') + (e.byEmail ? ' (' + e.byEmail + ')' : '') + (e.comment ? ': ' + e.comment.slice(0,120) : '') + (e.error ? ': ' + String(e.error).slice(0,160) : '');
+      tl.push({ ts: e.ts || e.sentAt || '', type: e.type, text: desc, user: e.sentBy || e.byCustomer || (e.type === 'email_sent' ? 'System' : 'Kund'), _src:'customer' });
     });
 
     tl.sort(function(a, b) { return (b.ts || '').localeCompare(a.ts || ''); });
 
     const typeIcon = {create:'plus-circle', edit:'pencil', status:'refresh-cw', send:'send', pdf:'printer', comment:'message-square', ao:'clipboard-list', ring:'phone', email:'mail', followup:'bell', reminder:'clock', price:'dollar-sign', change:'edit-3', verbal:'thumbs-up', reason:'help-circle', tip:'message-square',
-      opened:'eye', approved:'check-circle', change_requested:'edit-3', declined:'x-circle', revoked:'x-circle', renewed:'refresh-cw' };
+      opened:'eye', approved:'check-circle', change_requested:'edit-3', declined:'x-circle', revoked:'x-circle', renewed:'refresh-cw', email_sent:'send' };
     const typeColor = {create:'var(--navy)', edit:'var(--mt)', status:'var(--or)', send:'var(--blue)', pdf:'#6366f1', comment:'#0891b2', ao:'var(--grn)', ring:'var(--sky)', email:'var(--blue)', followup:'var(--or)', reminder:'var(--yl)', price:'#b45309', change:'var(--pu)', verbal:'var(--gr)', reason:'var(--mt)', tip:'var(--mt)',
-      opened:'var(--sky)', approved:'var(--gr)', change_requested:'var(--or)', declined:'var(--rd)', revoked:'var(--rd)', renewed:'var(--blue)' };
+      opened:'var(--sky)', approved:'var(--gr)', change_requested:'var(--or)', declined:'var(--rd)', revoked:'var(--rd)', renewed:'var(--blue)', email_sent:'var(--blue)' };
     const id = off.id;
     const isSent = off.status === 'skickad' || off.status === 'påmind' || off.status === 'väntar';
     return `<div class="card" style="margin-top:8px;">
@@ -3210,8 +3220,6 @@ ${hasRut?`<div class="rut">
     const cu = getCu(off.customerId);
     const cuEmail    = cu ? (cu.email||'') : '';
     const firstName  = cu ? (cu.firstName||cu.name||'') : '';
-    const hasToken   = !!off.publicToken && !off.tokenRevokedAt;
-
     const _interpolate = (tmplStr, extra) => {
       const sentDate = off.sentAt ? new Date(off.sentAt).toLocaleDateString('sv-SE',{day:'numeric',month:'short',year:'numeric'}) : '—';
       const data = {
@@ -3230,7 +3238,7 @@ ${hasRut?`<div class="rut">
 
     const defaultTmpl = (state.emailTemplates||[]).find(t=>t.type==='send_offer') || {
       subject: 'Offert ' + off.id + (off.title?' – '+off.title:''),
-      body: 'Hej {{firstName}},\n\nTack för ditt intresse. Bifogat hittar du vår offert ' + off.id + (off.title?' – '+off.title:'') + '.\n\nOfferten är giltig till ' + (off.validUntil||'—') + '.\n\n' + (hasToken ? 'Du kan också se och svara på offerten online: {{OFFER_LINK}}\n\n' : '') + 'Med vänliga hälsningar,\nVIFT Fastighetsservice'
+      body: 'Hej {{firstName}},\n\nTack för ditt intresse. Bifogat hittar du vår offert ' + off.id + (off.title?' – '+off.title:'') + '.\n\nOfferten är giltig till ' + (off.validUntil||'—') + '.\n\nDu kan också se och svara på offerten online: {{OFFER_LINK}}\n\nMed vänliga hälsningar,\nVIFT Fastighetsservice'
     };
 
     const tmplOpts = (state.emailTemplates||[]).filter(t=>t.active!==false)
@@ -3256,9 +3264,6 @@ ${hasRut?`<div class="rut">
       title: ic('send',14) + ' Skicka offert',
       wide: true,
       body: `
-        ${!hasToken ? `<div style="background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.3);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--or);margin-bottom:10px;display:flex;align-items:center;gap:6px;">
-          ${ic('alert-triangle',12)} Ingen digital länk genererad — aktivera digital länk för att kunden ska kunna svara online.
-        </div>` : ''}
         ${tmplOpts ? `<div class="fg"><label>Mejlmall</label>
           <select id="send-tmpl" onchange="OfferDetailPage._applySendTemplate('${offerId}',this.value)">${tmplOpts}</select></div>` : ''}
         <div class="fg"><label>Till <small style="color:var(--mt);font-weight:400;">— kommaseparerade adresser</small></label>
@@ -3271,7 +3276,7 @@ ${hasRut?`<div class="rut">
         </div>
         <div class="fg"><label>Ämne</label>
           <input id="send-subject" value="${esc(subject)}" style="width:100%;box-sizing:border-box;"></div>
-        <div class="fg"><label>Meddelande <small style="color:var(--mt);font-weight:400;">— ${ic('link',10)} ${hasToken?'{{OFFER_LINK}} ersätts med säker offertlänk':'digital länk ej aktiverad'}</small></label>
+        <div class="fg"><label>Meddelande <small style="color:var(--mt);font-weight:400;">— ${ic('link',10)} {{OFFER_LINK}} ersätts med säker offertlänk (skapas automatiskt vid utskick)</small></label>
           <textarea id="send-body" rows="8" style="width:100%;box-sizing:border-box;">${esc(body2)}</textarea></div>
         ${attCheckboxes}
         <label style="display:flex;align-items:center;gap:8px;padding:8px 0;cursor:pointer;font-size:12px;">
@@ -3287,6 +3292,31 @@ ${hasRut?`<div class="rut">
       ]
     });
     setTimeout(() => document.getElementById('send-to')?.focus(), 80);
+  },
+
+  _applyServerPatches(off, json) {
+    var changed = false;
+    if (json.offerPatch) {
+      var stateOff = (state.offers||[]).find(function(o){ return o.id === off.id; });
+      if (stateOff) Object.assign(stateOff, json.offerPatch);
+      Object.assign(off, json.offerPatch);
+      changed = true;
+    }
+    if (json.attachmentPatches && json.attachmentPatches.length) {
+      (state.offerAttachments||[]).forEach(function(a) {
+        var p = json.attachmentPatches.find(function(x){ return x.id === a.id; });
+        if (p) { a.lockedInVersion = p.lockedInVersion; changed = true; }
+      });
+    }
+    if (json.emailEvent) {
+      if (!Array.isArray(state.offerEvents)) state.offerEvents = [];
+      // Undvik dubbletter (idempotens)
+      if (!state.offerEvents.find(function(e){ return e.id === json.emailEvent.id; })) {
+        state.offerEvents.push(json.emailEvent);
+        changed = true;
+      }
+    }
+    return changed;
   },
 
   async _doSendEmail(off) {
@@ -3313,17 +3343,17 @@ ${hasRut?`<div class="rut">
     const bodyHtml = '<div style="font-family:sans-serif;font-size:14px;line-height:1.6;color:#1e293b;">' +
       bodyTxt.replace(/\n/g,'<br>') + '</div>';
 
-    const sentBy = state.currentUser?.id || '';
-
     // Knapp deaktivera för att undvika dubbelklick
     const sendBtn = document.querySelector('.modal-footer .btn.bp');
     if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = 'Skickar…'; }
 
-    let messageId = '';
-    let sendOk    = false;
-    let sendErr   = '';
+    let messageId  = '';
+    let sendOk     = false;
+    let sendErr    = '';
+    let serverJson = {};
+    let patchesApplied = false;
 
-    // Försök via Edge Function
+    // Skicka via Edge Function — offerToken och sentBy hanteras server-side
     try {
       const jwt = typeof Auth !== 'undefined' ? Auth.getAccessToken() : null;
       if (!jwt) throw new Error('Inte inloggad');
@@ -3339,48 +3369,49 @@ ${hasRut?`<div class="rut">
         },
         body: JSON.stringify({
           offerId:      off.id,
-          offerVersion: off.version || 1,
           recipients,
           cc,
           bcc,
           subject,
           bodyHtml,
-          offerToken:   off.publicToken || '',
           attachmentIds,
-          sentBy,
         })
       });
 
-      const json = await res.json().catch(() => ({}));
+      serverJson = await res.json().catch(() => ({}));
+
+      // Applicera serverpatchar på state INNAN vi kontrollerar res.ok —
+      // token, snapshot och bilagelås är redan sparade server-side
+      patchesApplied = this._applyServerPatches(off, serverJson);
+
       if (res.ok) {
-        messageId = json.messageId || '';
         sendOk    = true;
+        messageId = serverJson.messageId || '';
       } else {
-        sendErr = json.detail || json.error || ('HTTP ' + res.status);
+        sendErr = serverJson.detail || serverJson.error || ('HTTP ' + res.status);
       }
     } catch (e) {
       sendErr = String(e);
     }
 
-    // Fallback: mailto: om EF inte tillgänglig
+    // Vid fel: bevara serverändringar med persist() och stanna kvar i dialogen
     if (!sendOk) {
-      const mailtoFallback = `mailto:${recipients.join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyTxt)}`;
-      console.warn('[send-offer-email] EF failed, mailto fallback:', sendErr);
-      window.open(mailtoFallback, '_blank');
-      showToast('Kunde inte skicka via server — öppnar e-postklient');
-      if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Skicka'; }
+      console.error('[send-offer-email] Fel:', sendErr);
+      showToast('Kunde inte skicka offerten: ' + sendErr, 'error');
+      if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = ic('send',13) + ' Skicka'; }
+      if (patchesApplied) persist();
       return;
     }
 
-    // Uppdatera offert
+    // Endast vid lyckat utskick: uppdatera CRM-statusfält
     off.status      = 'skickad';
-    off.sentAt      = off.sentAt || new Date().toISOString();
+    off.sentAt      = off.sentAt || serverJson.sentAt || new Date().toISOString();
     off.emailSentTo = recipients[0];
     off.updatedAt   = new Date().toISOString();
 
-    this._logEvt(off, 'email_sent', 'Offert skickad till ' + recipients.join(', ') + (cc.length?' (CC: '+cc.join(', ')+')':''));
+    // LOGGA INTE email_sent internt — serverns emailEvent täcker det i den externa tidslinjen
 
-    // Uppföljning
+    // Uppföljning — detta är en separat intern händelse, inte email_sent
     if (document.getElementById('send-followup')?.checked) {
       if (typeof ActivitiesService !== 'undefined') {
         ActivitiesService.create({
@@ -3389,7 +3420,7 @@ ${hasRut?`<div class="rut">
           relatedType: 'offer',
           relatedId:   off.id,
           customerId:  off.customerId || null,
-          assignedTo:  sentBy || null,
+          assignedTo:  state.currentUser?.id || null,
           dueDate:     _ds(3),
           dueTime:     '09:00',
           note:        'Offert skickad till ' + recipients.join(', ') + ' — följ upp om 3 dagar',
@@ -3477,8 +3508,10 @@ ${hasRut?`<div class="rut">
     const sendBtn = document.querySelector('.modal-footer .btn.bp');
     if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = 'Skickar…'; }
 
-    let sendOk  = false;
-    let sendErr = '';
+    let sendOk     = false;
+    let sendErr    = '';
+    let remindJson = {};
+    let patchesApplied = false;
     try {
       const jwt   = typeof Auth !== 'undefined' ? Auth.getAccessToken() : null;
       if (!jwt) throw new Error('Inte inloggad');
@@ -3491,30 +3524,32 @@ ${hasRut?`<div class="rut">
           'Authorization': 'Bearer ' + jwt
         },
         body: JSON.stringify({
-          offerId: off.id, offerVersion: off.version || 1,
+          offerId: off.id,
           recipients, cc: [], bcc: [], subject, bodyHtml,
-          offerToken: off.publicToken || '',
           attachmentIds: [],
-          sentBy: state.currentUser?.id || '',
         })
       });
+      remindJson = await res.json().catch(()=>({}));
+
+      // Applicera serverpatchar på state OAVSETT utskicksresultat
+      patchesApplied = this._applyServerPatches(off, remindJson);
+
       sendOk = res.ok;
-      if (!sendOk) {
-        const j = await res.json().catch(()=>({}));
-        sendErr = j.detail || j.error || ('HTTP ' + res.status);
-      }
+      if (!sendOk) sendErr = remindJson.detail || remindJson.error || ('HTTP ' + res.status);
     } catch(e) {
       sendErr = String(e);
     }
 
+    // Vid fel: bevara serverändringar med persist() och stanna kvar i dialogen
     if (!sendOk) {
-      const fallback = `mailto:${recipients.join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyTxt)}`;
-      window.open(fallback, '_blank');
-      showToast('EF-fel – öppnar e-postklient');
-      if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Skicka påminnelse'; }
+      console.error('[send-offer-email] Påminnelsefel:', sendErr);
+      showToast('Kunde inte skicka påminnelsen: ' + sendErr, 'error');
+      if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = ic('bell',13) + ' Skicka påminnelse'; }
+      if (patchesApplied) persist();
       return;
     }
 
+    // Endast vid lyckat utskick: uppdatera CRM-statusfält
     off.status         = 'påmind';
     off.reminderSentAt = new Date().toISOString();
     off.updatedAt      = new Date().toISOString();
@@ -3985,7 +4020,10 @@ ${hasRut?`<div class="rut">
         validityText: off.validityText, terms: off.terms, includes: off.includes,
         excludes: off.excludes, scope: off.scope, summary: off.summary,
         generalTerms: off.generalTerms, address: off.address,
-        customerName: (() => { const cu = getCu(off.customerId); return cu ? (typeof CustomerService!=='undefined'?CustomerService.displayName(cu):cu.name||'') : ''; })()
+        customerName: (() => { const cu = getCu(off.customerId); return cu ? (typeof CustomerService!=='undefined'?CustomerService.displayName(cu):cu.name||'') : ''; })(),
+        publicAttachmentIds: (state.offerAttachments||[])
+          .filter(function(a){ return a.offerId===offerId && a.active!==false && a.includeInPublicView===true; })
+          .map(function(a){ return a.id; })
       };
       off.publicToken        = token;
       off.tokenCreatedAt     = now;
