@@ -18,17 +18,25 @@
  * v22: send-offer-email v5 — PageShells v96
  */
 
-const CACHE_NAME = 'vift-crm-v22';
+const CACHE_NAME = 'vift-crm-v25';
 
 /* Filer att förcacha vid install (app shell) */
 const PRECACHE_URLS = [
   '/',
-  '/index.html',
-  '/assets/vift-logo.svg',
-  '/assets/vift-logo-white.svg',
+  '/manifest.json',
+  '/assets/vift-logo-black.png',
+  '/assets/vift-logo-white.png',
+  '/assets/vift-symbol-black.png',
+  '/assets/vift-symbol-white.png',
+  '/assets/favicon.ico',
+  '/assets/favicon-16x16.png',
+  '/assets/favicon-32x32.png',
+  '/assets/favicon-48x48.png',
+  '/assets/icon-180.png',
   '/assets/icon-192.png',
   '/assets/icon-512.png',
-  '/assets/icon-180.png'
+  '/assets/icon-maskable-192.png',
+  '/assets/icon-maskable-512.png'
 ];
 
 /* Dessa domäner passeras alltid direkt — ingen intercept */

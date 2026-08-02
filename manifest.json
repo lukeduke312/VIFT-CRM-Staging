@@ -1,26 +1,36 @@
 {
   "name": "VIFT CRM",
   "short_name": "VIFT",
-  "description": "VIFT Fastighetsservice — CRM och arbetsorderhantering",
+  "description": "Fastighetsförvaltning och arbetsorderhantering för VIFT",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#0A1628",
   "theme_color": "#0A1628",
-  "orientation": "any",
-  "lang": "sv",
+  "background_color": "#0A1628",
   "icons": [
     {
       "src": "/assets/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/assets/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/assets/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

@@ -58,7 +58,7 @@ a { color: var(--blue); text-decoration: none; }
   print-color-adjust: exact;
   -webkit-print-color-adjust: exact;
 }
-.po-logo { font-size: 22px; font-weight: 900; letter-spacing: -.5px; }
+.po-logo-img { height: 44px; width: auto; max-width: 230px; object-fit: contain; display: block; }
 .po-logo span { color: #60a5fa; }
 .po-header-sub { font-size: 11px; opacity: .65; margin-top: 2px; }
 .po-version-badge {
@@ -285,13 +285,19 @@ a { color: var(--blue); text-decoration: none; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
+<meta name="theme-color" content="#0A1628">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/assets/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/assets/icon-180.png">
 </head>
 <body>
 
 <!-- Header -->
 <div class="po-header">
   <div>
-    <div class="po-logo">VIFT <span>Fastighetsservice</span></div>
+    <img class="po-logo-img" src="/assets/vift-logo-white.png" alt="VIFT Fastighetsservice">
     <div class="po-header-sub">Digital offert — säker länk</div>
   </div>
   <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">

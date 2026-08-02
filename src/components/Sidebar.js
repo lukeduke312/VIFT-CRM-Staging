@@ -45,7 +45,8 @@ const Sidebar = {
     const userName = user ? `${user.firstName} ${user.lastName}`.trim() : 'VIFT';
     const userRole = user ? cap(user.role) : '';
 
-    const brandLogo  = BrandingService.logoDark();
+    const _sidebarBg = (state.settings && state.settings.primaryColor) || '#0f3763';
+    const brandLogo  = BrandingService.logoForBg(_sidebarBg);
     const collapsed  = document.body.classList.contains('sidebar-collapsed');
     let html = `
       <div class="nav-brand">

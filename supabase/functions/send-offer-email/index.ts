@@ -63,7 +63,7 @@ const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const RESEND_API_KEY   = Deno.env.get('RESEND_API_KEY')            ?? ''
 const FROM_EMAIL       = Deno.env.get('FROM_EMAIL')                ?? 'offert@viftfast.se'
 const FROM_NAME        = Deno.env.get('FROM_NAME')                 ?? 'VIFT Fastighetsservice'
-const PUBLIC_BASE_URL  = Deno.env.get('PUBLIC_BASE_URL')           ?? 'https://app.viftfast.se'
+const PUBLIC_BASE_URL  = Deno.env.get('PUBLIC_BASE_URL')           ?? 'https://staging-crm.viftfast.se'
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -541,10 +541,15 @@ serve(async (req: Request) => {
   /* Bygg rätt offertlänk */
   const offerLink = `${PUBLIC_BASE_URL}/public-offer.html?t=${encodeURIComponent(offerToken)}`
 
+
+  /* Lägg till logotyp-header (vit e-postbakgrund → svart logotyp) */
+  const logoHeader = `<div style="text-align:left;padding:24px 0 16px 0;border-bottom:1px solid #e5e7eb;margin-bottom:24px;"><img src="${PUBLIC_BASE_URL}/assets/vift-logo-black.png" alt="VIFT" style="height:40px;width:auto;" /></div>`
+  const bodyWithLogo = logoHeader + bodyHtml
+
   /* Injicera offertlänk om platshållare finns, annars lägg till sist */
-  const finalHtml = bodyHtml.includes('{{OFFER_LINK}}')
-    ? bodyHtml.replace(/\{\{OFFER_LINK\}\}/g, offerLink)
-    : bodyHtml + `\n<p><a href="${offerLink}">Visa offert online</a></p>`
+  const finalHtml = bodyWithLogo.includes('{{OFFER_LINK}}')
+    ? bodyWithLogo.replace(/\{\{OFFER_LINK\}\}/g, offerLink)
+    : bodyWithLogo + `\n<p><a href="${offerLink}">Visa offert online</a></p>`
 
   /* Bygg Resend payload */
   const resendTo = normalizedTo.map(r => r.name ? `${r.name} <${r.email}>` : r.email)
