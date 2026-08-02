@@ -18,7 +18,7 @@
  * v22: send-offer-email v5 — PageShells v96
  */
 
-const CACHE_NAME = 'vift-crm-v26';
+const CACHE_NAME = 'vift-crm-v27';
 
 /* Filer att förcacha vid install (app shell) */
 const PRECACHE_URLS = [
@@ -32,11 +32,11 @@ const PRECACHE_URLS = [
   '/assets/favicon-16x16.png',
   '/assets/favicon-32x32.png',
   '/assets/favicon-48x48.png',
-  '/assets/icon-180.png',
-  '/assets/icon-192.png',
-  '/assets/icon-512.png',
-  '/assets/icon-maskable-192.png',
-  '/assets/icon-maskable-512.png'
+  '/assets/icon-180.png?v=2',
+  '/assets/icon-192.png?v=2',
+  '/assets/icon-512.png?v=2',
+  '/assets/icon-maskable-192.png?v=2',
+  '/assets/icon-maskable-512.png?v=2'
 ];
 
 /* Dessa domäner passeras alltid direkt — ingen intercept */
@@ -143,8 +143,8 @@ self.addEventListener('push', event => {
   const title   = payload.title || 'VIFT CRM';
   const options = {
     body:               payload.body || '',
-    icon:               '/assets/icon-192.png',
-    badge:              '/assets/icon-192.png',
+    icon:               '/assets/icon-192.png?v=2',
+    badge:              '/assets/icon-192.png?v=2',
     data:               { url: payload.url || '/', aoId: payload.aoId || null },
     requireInteraction: false
   };
