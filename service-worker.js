@@ -18,7 +18,7 @@
  * v22: send-offer-email v5 — PageShells v96
  */
 
-const CACHE_NAME = 'vift-crm-v25';
+const CACHE_NAME = 'vift-crm-v26';
 
 /* Filer att förcacha vid install (app shell) */
 const PRECACHE_URLS = [
